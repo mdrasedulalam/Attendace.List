@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #6e48aa, #9d50bb);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin: 0;
+        }
+        .header p {
+            font-size: 18px;
+            margin: 10px 0 0;
+        }
+        .selection-panel {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #444;
+        }
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 20px; 
+            background-color: white;
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #6e48aa;
+            color: white;
+        }
+        .present { 
+            background-color: #d4edda; 
+        }
+        .absent { 
+            background-color: #f8d7da; 
+        }
+        button { 
+            padding: 10px 15px; 
+            margin: 5px; 
+            cursor: pointer;
+            background-color: #6e48aa;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background-color: #9d50bb;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .upload-container { 
+            margin-bottom: 20px; 
+        }
+        .hidden { 
+            display: none; 
+        }
+        .serial-no { 
+            width: 50px; 
+            text-align: center; 
+        }
+        .course-option {
+            font-weight: bold;
+            color: #6e48aa;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>PRESENT ATTENDANCE</h1>
+        <p>Please select your course and section from the dropdown options below:</p>
+    </div>
+    
+    <div class="selection-panel">
+        <div class="form-group">
+            <label>Available Courses:</label>
+            <select id="courseSelect">
+                <option value="">-- Select Course --</option>
+                <option value="0413-225" class="course-option">0413-225 – Human Resource Management</option>
+                <option value="0412-221" class="course-option">0412-221 – Financial Management</option>
+                <option value="0542-217" class="course-option">0542-217 – Statistics for Decision Making (LAB)</option>
+                <option value="0542-213" class="course-option">0542-213 – Statistics for Decision Making</option>
+                <option value="0541-214" class="course-option">0541-214 – Differential and Integral Calculus</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>Available Sections:</label>
+            <select id="sectionSelect">
+                <option value="">-- Select Section --</option>
+                <option value="A">A</option>
+                <option value="A1">A1</option>
+                <option value="A2">A2</option>
+                <option value="B">B</option>
+                <option value="B1">B1</option>
+                <option value="B2">B2</option>
+                <option value="C">C</option>
+                <option value="C1">C1</option>
+                <option value="C2">C2</option>
+                <option value="D">D</option>
+                <option value="D1">D1</option>
+                <option value="D2">D2</option>
+                <option value="E">E</option>
+                <option value="E1">E1</option>
+                <option value="E2">E2</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="upload-container">
+        <h3>Upload Student Data (Excel)</h3>
+        <input type="file" id="excelFile" accept=".xlsx, .xls">
+        <button onclick="loadStudentData()">Load Students</button>
+    </div>
+    
+    <div id="attendanceSection" class="hidden">
+        <div>
+            <label for="date">Date:</label>
+            <input type="date" id="date" required>
+            <button onclick="markAllPresent()">Mark All Present</button>
+            <button onclick="generatePDF()">Generate PDF Report</button>
+        </div>
+        
+        <table id="attendanceTable">
+            <thead>
+                <tr>
+                    <th class="serial-no">SL</th>
+                    <th>Student Name</th>
+                    <th>Student ID</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="studentList">
+                <!-- Student rows will be added here -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Global students array
+        let students = [];
+        let currentCourse = "";
+        let currentSection = "";
+        
+        // Initialize jsPDF when window loads
+        window.onload = function() {
+            // Ensure jsPDF is properly loaded
+            if (window.jspdf && window.jspdf.jsPDF) {
+                console.log("jsPDF is ready");
+            } else {
+                console.error("jsPDF not loaded properly");
+            }
+        };
+        
+        // Load student data from Excel
+        function loadStudentData() {
+            currentCourse = document.getElementById('courseSelect').value;
+            currentSection = document.getElementById('sectionSelect').value;
+            
+            if (!currentCourse || !currentSection) {
+                alert("Please select both course and section");
+                return;
+            }
+            
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert("Please select an Excel file first");
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Get first sheet
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                
+                // Convert to JSON
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                
+                // Process data (skip header row)
+                students = [];
+                for (let i = 1; i < jsonData.length; i++) {
+                    const row = jsonData[i];
+                    if (row.length >= 3) { // Ensure we have at least 3 columns
+                        students.push({
+                            sl: i, // Serial number from Excel row
+                            name: row[1]?.toString().trim() || '',
+                            id: row[2]?.toString().trim() || ''
+                        });
+                    }
+                }
+                
+                // Remove duplicates
+                students = students.filter((student, index, self) =>
+                    index === self.findIndex((s) => (
+                        s.id === student.id && s.name === student.name
+                    ))
+                );
+                
+                // Reassign serial numbers after deduplication
+                students.forEach((student, index) => {
+                    student.sl = index + 1;
+                });
+                
+                // Initialize attendance
+                initializeAttendance();
+                document.getElementById('attendanceSection').classList.remove('hidden');
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // Initialize attendance table
+        function initializeAttendance() {
+            const tableBody = document.getElementById('studentList');
+            tableBody.innerHTML = '';
+            
+            // Set today's date as default
+            document.getElementById('date').valueAsDate = new Date();
+            
+            students.forEach(student => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="serial-no">${student.sl}</td>
+                    <td>${student.name}</td>
+                    <td>${student.id}</td>
+                    <td class="absent">Absent</td>
+                    <td>
+                        <button onclick="toggleAttendance(this)">Mark Present</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // Toggle attendance status
+        function toggleAttendance(button) {
+            const row = button.parentElement.parentElement;
+            const statusCell = row.cells[3]; // Changed index due to added SL column
+            
+            if (statusCell.textContent === "Absent") {
+                statusCell.textContent = "Present";
+                statusCell.className = "present";
+                button.textContent = "Mark Absent";
+            } else {
+                statusCell.textContent = "Absent";
+                statusCell.className = "absent";
+                button.textContent = "Mark Present";
+            }
+        }
+        
+        // Mark all students present
+        function markAllPresent() {
+            const buttons = document.querySelectorAll('#studentList button');
+            buttons.forEach(button => {
+                const row = button.parentElement.parentElement;
+                const statusCell = row.cells[3]; // Changed index due to added SL column
+                
+                if (statusCell.textContent === "Absent") {
+                    statusCell.textContent = "Present";
+                    statusCell.className = "present";
+                    button.textContent = "Mark Absent";
+                }
+            });
+        }
+        
+        // Generate PDF report
+        function generatePDF() {
+            const date = document.getElementById('date').value;
+            if (!date || !currentCourse || !currentSection) {
+                alert("Please select date, course, and section first");
+                return;
+            }
+            
+            // Get all present students
+            const presentStudents = [];
+            const rows = document.querySelectorAll('#studentList tr');
+            
+            rows.forEach(row => {
+                const cells = row.cells;
+                if (cells[3].textContent === "Present") {
+                    presentStudents.push({
+                        sl: cells[0].textContent,
+                        name: cells[1].textContent.toUpperCase(),
+                        id: cells[2].textContent
+                    });
+                }
+            });
+            
+            if (presentStudents.length === 0) {
+                alert("No students marked as present");
+                return;
+            }
+            
+            // Split students into chunks of 30
+            const chunkSize = 30;
+            const chunks = [];
+            for (let i = 0; i < presentStudents.length; i += chunkSize) {
+                chunks.push(presentStudents.slice(i, i + chunkSize));
+            }
+            
+            // Generate a PDF for each chunk
+            chunks.forEach((chunk, index) => {
+                // Check if jsPDF is available
+                if (!window.jspdf || !window.jspdf.jsPDF) {
+                    alert("Error: PDF library not loaded properly. Please refresh the page.");
+                    return;
+                }
+                
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Set font
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                
+                // Add header
+                doc.setFillColor(110, 72, 170);
+                doc.rect(0, 0, doc.internal.pageSize.getWidth(), 15, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(14);
+                doc.text("PRESENT ATTENDANCE", 105, 10, { align: 'center' });
+                
+                // Reset text color
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(10);
+                
+                // Add course and section information
+                const courseText = `Course: ${document.getElementById('courseSelect').selectedOptions[0].text}`;
+                const sectionText = `Section: ${currentSection}`;
+                const dateText = `Date: ${date}`;
+                const partText = `Part: ${index + 1} of ${chunks.length}`;
+                
+                doc.text(courseText, 14, 25);
+                doc.text(sectionText, 14, 30);
+                doc.text(dateText, 14, 35);
+                doc.text(partText, 14, 40);
+                
+                // Prepare table data with serial numbers restarting from 1
+                const tableData = chunk.map((student, i) => [
+                    (i + 1).toString(),
+                    student.name,
+                    student.id
+                ]);
+                
+                // Split into two tables if needed (15 students each)
+                const firstHalf = tableData.slice(0, 15);
+                const secondHalf = tableData.slice(15);
+                
+                // Add first table
+                doc.autoTable({
+                    head: [['SL', 'STUDENT NAME', 'STUDENT ID']],
+                    body: firstHalf,
+                    startY: 45,
+                    styles: { 
+                        cellPadding: 2,
+                        fontSize: 9,
+                        font: 'helvetica',
+                        fontStyle: 'normal',
+                        lineWidth: 0.1
+                    },
+                    headStyles: {
+                        fillColor: [110, 72, 170],
+                        textColor: [255, 255, 255],
+                        cellPadding: 2
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 10, halign: 'center' },
+                        1: { cellWidth: 70 },
+                        2: { cellWidth: 30 }
+                    },
+                    margin: { left: 10, right: 10 }
+                });
+                
+                // Add second table if needed
+                if (secondHalf.length > 0) {
+                    doc.autoTable({
+                        head: [['SL', 'STUDENT NAME', 'STUDENT ID']],
+                        body: secondHalf,
+                        startY: doc.lastAutoTable.finalY + 5,
+                        styles: { 
+                            cellPadding: 2,
+                            fontSize: 9,
+                            font: 'helvetica',
+                            fontStyle: 'normal',
+                            lineWidth: 0.1
+                        },
+                        headStyles: {
+                            fillColor: [110, 72, 170],
+                            textColor: [255, 255, 255],
+                            cellPadding: 2
+                        },
+                        columnStyles: {
+                            0: { cellWidth: 10, halign: 'center' },
+                            1: { cellWidth: 70 },
+                            2: { cellWidth: 30 }
+                        },
+                        margin: { left: 10, right: 10 }
+                    });
+                }
+                
+                // Save PDF
+                doc.save(`Attendance_${currentCourse}_${currentSection}_${date}_Part${index + 1}.pdf`);
+            });
+        }
+    </script>
+</body>
+</html>
